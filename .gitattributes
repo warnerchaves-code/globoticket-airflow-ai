@@ -1,0 +1,12 @@
+# Keep LF on checkout everywhere, Windows included.
+#
+# These scripts run in Git Bash on the author's machine and then get copied to an
+# Ubuntu VM. A CRLF checkout breaks both: bash reports "\r: command not found" and
+# the shebang line silently resolves to nothing.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.py   text eol=lf
+*.sql  text eol=lf

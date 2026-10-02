@@ -1,0 +1,29 @@
+Globoticket - Airflow 3 AI and agentic pipelines
+Copyright 2026 Warner Chaves
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This product includes a modified copy of the Apache Airflow project's
+docker-compose quickstart file:
+
+  docker-compose.yaml
+
+Apache Airflow
+Copyright 2016-2026 The Apache Software Foundation
+
+This product includes software developed at The Apache Software Foundation
+(http://www.apache.org/).
+
+The original file is available from the Apache Airflow documentation at
+https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/
+and is licensed under the Apache License, Version 2.0. The ASF license header
+has been preserved in the file. Modifications made here:
+
+  - the image is built from the Dockerfile in this repo (build: .), which adds
+    the Common AI Provider to apache/airflow:3.3.2
+  - AIRFLOW__CORE__LOAD_EXAMPLES set to 'false'
+  - AIRFLOW__CORE__TEST_CONNECTION set to 'Enabled'
+  - AIRFLOW__CORE__FERNET_KEY read from the environment
+  - AIRFLOW__CORE__ALLOWED_DESERIALIZATION_CLASSES set to allow globoticket_models
+  - the assets/ directory mounted read-only at /opt/airflow/assets
+  - a globoticket-pg PostgreSQL 16 service for the event catalog
