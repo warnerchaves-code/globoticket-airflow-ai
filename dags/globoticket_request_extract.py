@@ -1,4 +1,5 @@
 """Extract a typed EventRequest from a Globoticket promoter request."""
+import logging
 from pathlib import Path
 
 import pendulum
@@ -6,6 +7,8 @@ import pendulum
 from airflow.sdk import dag, task
 
 from globoticket_models import EventRequest
+
+log = logging.getLogger(__name__)
 
 REQUEST_FILE = Path("/opt/airflow/assets/promoter_request.txt")
 LLM_CONN_ID = "globoticket_llm"
@@ -40,12 +43,12 @@ def globoticket_request_extract():
 
     @task
     def check_fields(event: EventRequest) -> dict:
-        print("type:", type(event).__name__)
+        log.info("type: %s", type(event).__name__)
         missing = [name for name in REQUIRED_FIELDS if getattr(event, name) is None]
         present = [name for name in REQUIRED_FIELDS if name not in missing]
-        print("present:", ", ".join(present))
-        print("missing:", ", ".join(missing) or "none")
-        print("complete:", not missing)
+        log.info("present: %s", ", ".join(present))
+        log.info("missing: %s", ", ".join(missing) or "none")
+        log.info("complete: %s", not missing)
         return {"complete": not missing, "missing": missing}
 
     check_fields(extract(read_request()))
