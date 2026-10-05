@@ -6,7 +6,7 @@
 # deallocated it, then:
 #
 #   1. deletes the run history of the course's own Dags, named one by one below
-#   2. recreates the Connections from .env
+#   2. recreates the Connections from .env and re-uploads the event brief files
 #
 # Later modules add steps here as their demos need them.
 #
@@ -25,7 +25,7 @@ say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 # The Dags whose history a replay should not see. Named explicitly rather than matched by
 # pattern, so a reset never touches a Dag it wasn't written for.
-COURSE_DAGS="'globoticket_request_summary', 'globoticket_request_extract'"
+COURSE_DAGS="'globoticket_request_summary', 'globoticket_request_extract', 'globoticket_event_brief_extract', 'globoticket_event_brief_routing'"
 
 # --- 0. is the VM running? ----------------------------------------------------
 say "Checking the VM"

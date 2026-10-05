@@ -10,6 +10,8 @@
 #   globoticket_blob   adls               the intake container in Azure storage
 #   globoticket_pg     postgres           the event catalog database on the VM
 #
+# It also uploads the event brief files in assets/event-briefs/ to Blob Storage.
+#
 # The values come from .env. Nothing is typed by hand and nothing is committed.
 #
 set -euo pipefail
@@ -87,6 +89,15 @@ $SSH "$VM_USER@$VM_IP" "cd /opt/globoticket && \
     airflow-scheduler bash /tmp/_mkconns.sh"
 $SSH "$VM_USER@$VM_IP" "rm -f /tmp/_mkconns.sh"
 
+# --- the event brief files ---------------------------------------------------
+# Module 2 reads event briefs from Blob Storage. The files live in assets/event-briefs/
+# in this repo; this copies them to the intake container's event-briefs/ folder.
+# --overwrite makes it safe to re-run, which is how reset_demo.sh puts them back.
+say "Uploading the event brief files"
+CONTAINER=$(get STORAGE_CONTAINER)
+az storage blob upload-batch   --account-name "$SA" --account-key "$KEY"   --destination "$CONTAINER" --destination-path event-briefs   --source "$HERE/assets/event-briefs" --pattern "*.md" --overwrite   --only-show-errors --no-progress -o none
+for f in "$HERE"/assets/event-briefs/*.md; do echo "  event-briefs/$(basename "$f")"; done
+
 # --- prove they work ----------------------------------------------------------
 # NOT the Test Connection button. On the Azure OpenAI connection type it only resolves the
 # model name and never calls it, so it passes with a wrong key. This Dag calls all three
@@ -97,6 +108,9 @@ say "Verifying with the globoticket_check_environment Dag"
 VERIFY=$(mktemp)
 cat > "$VERIFY" <<'REMOTE'
 #!/bin/bash
+# Keep this Dag paused. `airflow dags test` runs it in-process, and if the Dag is unpaused
+# the scheduler picks up the same run too, so tasks run twice and race each other.
+airflow dags pause globoticket_check_environment >/dev/null 2>&1 || true
 airflow dags test globoticket_check_environment >/dev/null 2>&1
 RID=$(airflow dags list-runs globoticket_check_environment -o json 2>/dev/null \
       | python -c 'import json,sys; print(json.load(sys.stdin)[0]["run_id"])')

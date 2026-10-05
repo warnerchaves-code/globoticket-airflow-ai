@@ -85,11 +85,11 @@ for i in $(seq 1 60); do
 done
 
 # --- confirm the provider, unpause the Dags ----------------------------------
-say "Checking the Common AI Provider and unpausing the course Dags"
+say "Checking the Common AI Provider and unpausing the course Dags (not the environment check, which script 3 runs on its own)"
 $SSH "$VM_USER@$VM_IP" "cd /opt/globoticket && sudo docker compose exec -T airflow-scheduler bash -lc '
   airflow providers list 2>/dev/null | grep -E \"common-ai\" | sed \"s/^/  /\"
   airflow dags reserialize >/dev/null 2>&1 || true
-  for d in \$(airflow dags list -o plain 2>/dev/null | awk \"NR>1 && /globoticket/ {print \\\$1}\"); do
+  for d in \$(airflow dags list -o plain 2>/dev/null | awk \"NR>1 && /globoticket/ && !/check_environment/ {print \\\$1}\"); do
     airflow dags unpause \$d >/dev/null 2>&1 && echo \"  unpaused \$d\"
   done'"
 
