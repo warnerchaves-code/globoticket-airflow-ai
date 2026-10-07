@@ -6,7 +6,8 @@
 # deallocated it, then:
 #
 #   1. deletes the run history of the course's own Dags, named one by one below
-#   2. recreates the Connections from .env and re-uploads the event brief files
+#   2. deletes the review packets module 3 published (review-packets/ only)
+#   3. recreates the Connections, reloads the catalog and re-uploads the event brief files
 #
 # Later modules add steps here as their demos need them.
 #
@@ -25,7 +26,7 @@ say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
 # The Dags whose history a replay should not see. Named explicitly rather than matched by
 # pattern, so a reset never touches a Dag it wasn't written for.
-COURSE_DAGS="'globoticket_request_summary', 'globoticket_request_extract', 'globoticket_event_brief_extract', 'globoticket_event_brief_routing'"
+COURSE_DAGS="'globoticket_request_summary', 'globoticket_request_extract', 'globoticket_event_brief_extract', 'globoticket_event_brief_routing', 'globoticket_event_brief_investigation', 'globoticket_review_packet'"
 
 # --- 0. is the VM running? ----------------------------------------------------
 say "Checking the VM"
@@ -54,6 +55,16 @@ say "Dag run history"
 $SSH "$VM_USER@$VM_IP" "cd /opt/globoticket && sudo docker compose exec -T postgres psql -U airflow -d airflow -q -t -c \
   \"DELETE FROM dag_run WHERE dag_id IN ($COURSE_DAGS) RETURNING dag_id;\"" | grep -c . | sed 's/^/  runs deleted: /' || true
 
-# --- 2. connections -----------------------------------------------------------
+# --- 2. review packets ---------------------------------------------------------
+# Module 3 publishes review packets. Only that folder is cleared, never the event briefs.
+say "Review packets"
+SA=$(get STORAGE_ACCOUNT); KEY=$(get STORAGE_KEY); CONTAINER=$(get STORAGE_CONTAINER)
+N=$(az storage blob list --account-name "$SA" --account-key "$KEY" -c "$CONTAINER" --prefix review-packets/       --query "length(@)" -o tsv --only-show-errors)
+if [ "${N:-0}" != "0" ]; then
+  az storage blob delete-batch --account-name "$SA" --account-key "$KEY" -s "$CONTAINER"     --pattern "review-packets/*.json" --only-show-errors -o none
+fi
+echo "  review packets deleted: ${N:-0}"
+
+# --- 3. connections -----------------------------------------------------------
 say "Connections"
 "$HERE/scripts/3_create_connections.sh"

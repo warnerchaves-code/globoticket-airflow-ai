@@ -112,13 +112,18 @@ Dockerfile                          apache/airflow:3.3.2 plus the Common AI Prov
 sitecustomize.py                    a fix for an adlfs / pydantic-ai event-loop clash (see below)
 docker-compose.yaml                 Airflow 3.3.2 from the official quickstart file, plus the catalog database
 assets/promoter_request.txt         the promoter email module 1 works with
-assets/event-briefs/               two event brief files module 2 reads from Blob Storage (step 3 uploads them)
+assets/event-briefs/               the event brief files modules 2 and 3 read from Blob Storage (step 3 uploads them)
+assets/catalog/events.json         120 synthetic catalog events, loaded into the catalog database by step 3
+api/                               the read-only Globoticket bookings API that module 3's agent calls (a container)
 dags/
-  globoticket_models.py             EventRequest, the typed output the LLM tasks return
+  globoticket_models.py             EventRequest and InvestigationResult, the typed outputs
   globoticket_request_summary.py    module 1 - an LLMOperator summarizes the request
   globoticket_request_extract.py    module 1 - @task.llm returns a typed EventRequest
   globoticket_event_brief_extract.py  module 2 - LLMFileAnalysisOperator reads an event brief from Blob Storage
   globoticket_event_brief_routing.py  module 2 - LLMBranchOperator routes it, with retries and usage limits
+  globoticket_tools.py              module 3 - the agent's two typed, read-only lookup tools
+  globoticket_event_brief_investigation.py  module 3 - @task.agent checks a complete event brief for conflicts
+  globoticket_review_packet.py      module 3 - the agent returns an InvestigationResult; code validates it and publishes a review packet
   globoticket_check_environment.py  setup check that step 3 runs
 scripts/                            the three setup scripts and the reset
 ```
@@ -127,7 +132,7 @@ More Dags arrive as the course goes on.
 
 ### The Dags only name a Connection
 
-Every Dag names its Connections (`globoticket_llm`, and `globoticket_blob` for module 2's storage) and nothing else. The endpoint, the API key and the model
+Every Dag names its Connections (`globoticket_llm`, `globoticket_blob`, `globoticket_pg` and `globoticket_api`) and nothing else. The endpoint, the API key and the model
 deployment all live in the Connection. You can `grep` the Dags to check.
 
 ### Typed output needs one setting

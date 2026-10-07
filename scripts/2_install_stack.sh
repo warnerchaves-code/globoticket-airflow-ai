@@ -63,16 +63,18 @@ REMOTE
 # The Airflow containers run as uid 50000 and take ownership of dags/ on first start, so
 # the old copies are removed with sudo before the new ones go up.
 say "Copying the repo to /opt/globoticket"
-$SSH "$VM_USER@$VM_IP" "sudo rm -rf /opt/globoticket/dags /opt/globoticket/assets"
-$SCP -q -r "$HERE/dags" "$HERE/assets" "$VM_USER@$VM_IP:/opt/globoticket/"
+$SSH "$VM_USER@$VM_IP" "sudo rm -rf /opt/globoticket/dags /opt/globoticket/assets /opt/globoticket/api"
+$SCP -q -r "$HERE/dags" "$HERE/assets" "$HERE/api" "$VM_USER@$VM_IP:/opt/globoticket/"
 $SCP -q "$HERE/Dockerfile" "$HERE/sitecustomize.py" "$HERE/docker-compose.yaml" "$ENV_FILE" \
   "$VM_USER@$VM_IP:/opt/globoticket/"
 $SSH "$VM_USER@$VM_IP" "chmod 600 /opt/globoticket/.env"
-echo "  dags, assets, Dockerfile, sitecustomize.py, docker-compose.yaml and .env"
+echo "  dags, assets, api, Dockerfile, sitecustomize.py, docker-compose.yaml and .env"
 
 # --- build and start ----------------------------------------------------------
+# --force-recreate: the new dags/ and assets/ folders replace the old ones, and a running
+# container keeps the old (deleted) folder mounted until it's recreated.
 say "Building the image and starting the stack (the first build takes a few minutes)"
-$SSH "$VM_USER@$VM_IP" "cd /opt/globoticket && sudo docker compose build -q && sudo docker compose up -d 2>&1 | tail -2"
+$SSH "$VM_USER@$VM_IP" "cd /opt/globoticket && sudo docker compose build -q && sudo docker compose up -d --force-recreate 2>&1 | tail -2"
 
 # --- wait for health ----------------------------------------------------------
 say "Waiting for Airflow to answer"

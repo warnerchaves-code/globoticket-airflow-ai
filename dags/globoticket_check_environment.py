@@ -1,4 +1,5 @@
-"""Prove the environment works: one model call, one storage listing, one database query.
+"""Prove the environment works: one model call, one storage listing, one database query,
+and one authenticated call to the bookings API.
 
 scripts/3_create_connections.sh runs this after creating the Connections. It is a setup
 check, not part of the course, so it is tagged `setup` and drops out of a `globoticket`
@@ -7,6 +8,7 @@ tag filter in the Dags list.
 import pendulum
 
 from airflow.providers.common.ai.operators.llm import LLMOperator
+from airflow.providers.http.hooks.http import HttpHook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.sdk import ObjectStoragePath, dag, task
 
@@ -39,9 +41,17 @@ def globoticket_check_environment():
         version = PostgresHook(postgres_conn_id="globoticket_pg").get_first("SELECT version()")[0]
         print(f"PostgreSQL ok - {version.split(',')[0]}")
 
+    @task
+    def check_api() -> None:
+        # An authenticated endpoint, so this proves the token in globoticket_api works too
+        bookings = HttpHook(method="GET", http_conn_id="globoticket_api").run(
+            "/venue-bookings", data={"venue": "orpheum hall", "date_from": "2026-01-01", "date_to": "2027-12-31"}).json()
+        print(f"Bookings API ok - globoticket_api answered with {len(bookings)} booking(s)")
+
     report_model(ask_model.output)
     check_storage()
     check_postgres()
+    check_api()
 
 
 globoticket_check_environment()

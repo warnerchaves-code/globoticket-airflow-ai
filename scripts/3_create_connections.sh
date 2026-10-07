@@ -9,8 +9,10 @@
 #   globoticket_llm    pydanticai_azure   the GPT model deployment in Microsoft Foundry
 #   globoticket_blob   adls               the intake container in Azure storage
 #   globoticket_pg     postgres           the event catalog database on the VM
+#   globoticket_api    http               the read-only bookings API on the VM (module 3)
 #
-# It also uploads the event brief files in assets/event-briefs/ to Blob Storage.
+# It also loads the event catalog into globoticket-pg and uploads the event brief files
+# in assets/event-briefs/ to Blob Storage.
 #
 # The values come from .env. Nothing is typed by hand and nothing is committed.
 #
@@ -25,6 +27,7 @@ VM_IP=$(get VM_PUBLIC_IP); VM_USER=$(get VM_USER); KEYFILE=$(get VM_SSH_KEY)
 OAI_ENDPOINT=$(get OAI_ENDPOINT); OAI_KEY=$(get OAI_KEY); OAI_DEPLOYMENT=$(get OAI_DEPLOYMENT)
 SA=$(get STORAGE_ACCOUNT); KEY=$(get STORAGE_KEY)
 PGDB=$(get PG_DATABASE); PGUSER=$(get PG_USER); PGPASS=$(get PG_PASSWORD)
+APITOKEN=$(get GLOBOTICKET_API_TOKEN)
 
 SSH="ssh -i $KEYFILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 SCP="scp -i $KEYFILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
@@ -37,7 +40,7 @@ TMP=$(mktemp)
 cat > "$TMP" <<'REMOTE'
 #!/bin/bash
 set -e
-for c in globoticket_llm globoticket_blob globoticket_pg; do
+for c in globoticket_llm globoticket_blob globoticket_pg globoticket_api; do
   airflow connections delete "$c" >/dev/null 2>&1 || true
 done
 
@@ -75,6 +78,39 @@ airflow connections add globoticket_pg \
   --conn-schema "${PGDB}" \
   --conn-login "${PGUSER}" --conn-password "${PGPASS}" >/dev/null
 echo "  globoticket_pg     postgres          globoticket-pg/${PGDB}"
+
+# The read-only bookings API runs in the globoticket-api container on the same network.
+# The token travels as an Authorization header from Extra, which Airflow masks as ***.
+airflow connections add globoticket_api \
+  --conn-type http \
+  --conn-host globoticket-api --conn-port 8000 --conn-schema http \
+  --conn-extra "{\"Authorization\": \"Bearer ${APITOKEN}\"}" >/dev/null
+echo "  globoticket_api    http              globoticket-api:8000"
+
+# The event catalog: 120 synthetic events, loaded fresh every run so a reset always
+# starts from the same catalog. It lives in globoticket-pg, not in Airflow's database.
+python - <<'PY'
+# A hook can't look up a Connection outside a running task in Airflow 3, so this
+# connects with psycopg2 directly, using the same values the Connection holds.
+import json, os
+import psycopg2
+events = json.load(open("/opt/airflow/assets/catalog/events.json", encoding="utf-8"))
+cols = ["event_id", "name", "act", "category", "venue", "city", "country", "capacity",
+        "base_price", "currency", "status", "promoter", "event_date"]
+with psycopg2.connect(host="globoticket-pg", dbname=os.environ["PGDB"],
+                      user=os.environ["PGUSER"], password=os.environ["PGPASS"]) as conn:
+    with conn.cursor() as cur:
+        cur.execute("""
+          DROP TABLE IF EXISTS events;
+          CREATE TABLE events (
+            event_id text PRIMARY KEY, name text, act text, category text, venue text, city text,
+            country text, capacity int, base_price numeric, currency text, status text,
+            promoter text, event_date date);
+        """)
+        cur.executemany(f"INSERT INTO events ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))})",
+                        [[e[c] for c in cols] for e in events])
+print(f"  event catalog      {len(events)} events loaded into globoticket-pg")
+PY
 REMOTE
 
 say "Creating the Connections"
@@ -85,7 +121,7 @@ $SSH "$VM_USER@$VM_IP" "cd /opt/globoticket && \
   sudo docker compose exec -T \
     -e OAI_ENDPOINT='$OAI_ENDPOINT' -e OAI_KEY='$OAI_KEY' -e OAI_DEPLOYMENT='$OAI_DEPLOYMENT' \
     -e SA='$SA' -e KEY='$KEY' \
-    -e PGDB='$PGDB' -e PGUSER='$PGUSER' -e PGPASS='$PGPASS' \
+    -e PGDB='$PGDB' -e PGUSER='$PGUSER' -e PGPASS='$PGPASS' -e APITOKEN='$APITOKEN' \
     airflow-scheduler bash /tmp/_mkconns.sh"
 $SSH "$VM_USER@$VM_IP" "rm -f /tmp/_mkconns.sh"
 
@@ -100,8 +136,9 @@ for f in "$HERE"/assets/event-briefs/*.md; do echo "  event-briefs/$(basename "$
 
 # --- prove they work ----------------------------------------------------------
 # NOT the Test Connection button. On the Azure OpenAI connection type it only resolves the
-# model name and never calls it, so it passes with a wrong key. This Dag calls all three
-# systems for real: one tiny model request, a container listing and a database query.
+# model name and never calls it, so it passes with a wrong key. This Dag calls all four
+# systems for real: one tiny model request, a container listing, a database query and an
+# authenticated bookings API call.
 say "Verifying with the globoticket_check_environment Dag"
 # `airflow dags test` passes a task's print() through only some of the time, so the
 # verdict comes from the task states Airflow recorded, not from grepping the output.
@@ -120,7 +157,8 @@ import json, sys
 what = {"ask_model": "model call through globoticket_llm",
         "report_model": "model reply read back from XCom",
         "check_storage": "listing abfs://globoticket-intake/ through globoticket_blob",
-        "check_postgres": "query through globoticket_pg"}
+        "check_postgres": "query through globoticket_pg",
+        "check_api": "authenticated call through globoticket_api"}
 rows = json.load(sys.stdin)
 for r in sorted(rows, key=lambda r: r["task_id"]):
     state, tid = r["state"], r["task_id"]

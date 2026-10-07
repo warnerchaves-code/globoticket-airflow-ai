@@ -1,0 +1,6 @@
+[
+  {"booking_id": "BKG-2201", "venue": "Orpheum Hall", "city": "Toronto", "start": "2026-11-10", "end": "2026-11-12", "holder": "private hire"},
+  {"booking_id": "BKG-2202", "venue": "Rue Verte", "city": "Montreal", "start": "2026-12-01", "end": "2026-12-01", "holder": "corporate"},
+  {"booking_id": "BKG-2203", "venue": "The Old Mill", "city": "Dublin", "start": "2027-04-10", "end": "2027-04-11", "holder": "private hire"},
+  {"booking_id": "BKG-2204", "venue": "Kanaal Zaal", "city": "Rotterdam", "start": "2027-02-14", "end": "2027-02-15", "holder": "maintenance"}
+]

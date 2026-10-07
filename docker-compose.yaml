@@ -110,6 +110,19 @@ services:
       start_period: 5s
     restart: always
 
+  globoticket-api:
+    # the read-only Globoticket bookings API that module 3's agent calls through a tool
+    build: ./api
+    image: globoticket/bookings-api:1.0.0
+    container_name: globoticket-api
+    environment:
+      GLOBOTICKET_API_TOKEN: ${GLOBOTICKET_API_TOKEN}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      retries: 5
+    restart: always
+
   globoticket-pg:
     # the Globoticket event catalog - separate from Airflow's own metadata database
     image: postgres:16
