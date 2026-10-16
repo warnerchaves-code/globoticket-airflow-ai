@@ -9,9 +9,12 @@
 # What ends up on the VM, in /opt/globoticket:
 #   Dockerfile, sitecustomize.py   the Globoticket image: Airflow 3.3.2 + the Common AI Provider
 #   docker-compose.yaml            Airflow (scheduler, api server, worker, triggerer, dag
-#                                  processor, metadata PostgreSQL, Redis) and the
-#                                  globoticket-pg event catalog database
-#   dags/  assets/                 the course Dags and the sample promoter request
+#                                  processor, metadata PostgreSQL, Redis), the
+#                                  globoticket-pg event catalog database and the
+#                                  globoticket-api bookings API
+#   dags/  assets/                 the course Dags, the promoter request, the event briefs
+#                                  and the catalog data
+#   api/                           the bookings API's source, built into its own image
 #   .env                           the generated secrets, copied from the repo root
 #
 set -euo pipefail

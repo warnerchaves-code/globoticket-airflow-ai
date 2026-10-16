@@ -183,6 +183,8 @@ cat <<EOF
   If storage failed             confirm the storage account has hierarchical namespace ON.
                                 Without it, abfs:// cannot resolve.
   If PostgreSQL failed          check 'sudo docker compose ps' on the VM shows globoticket-pg healthy
+  If the API failed             check globoticket-api is healthy there too, and that .env on the VM
+                                has GLOBOTICKET_API_TOKEN (re-run 2_install_stack.sh to copy it)
 
   Airflow UI   http://$VM_IP:8080     login  airflow / airflow
 

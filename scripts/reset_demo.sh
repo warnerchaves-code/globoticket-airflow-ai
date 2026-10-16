@@ -9,8 +9,6 @@
 #   2. deletes the review packets module 3 published (review-packets/ only)
 #   3. recreates the Connections, reloads the catalog and re-uploads the event brief files
 #
-# Later modules add steps here as their demos need them.
-#
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"

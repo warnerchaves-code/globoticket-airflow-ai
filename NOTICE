@@ -27,3 +27,4 @@ has been preserved in the file. Modifications made here:
   - AIRFLOW__CORE__ALLOWED_DESERIALIZATION_CLASSES set to allow globoticket_models
   - the assets/ directory mounted read-only at /opt/airflow/assets
   - a globoticket-pg PostgreSQL 16 service for the event catalog
+  - a globoticket-api service for the read-only bookings API, built from api/

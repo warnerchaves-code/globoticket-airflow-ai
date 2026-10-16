@@ -8,8 +8,8 @@ subscription rather than watching. Three scripts, about twenty minutes, most of 
 ## The case study
 
 Globoticket sells tickets for live events, and promoters run the events. When a promoter plans an
-event, they write one brief and send it to every ticketing partner they work with. Globoticket is one
-of those partners. Today the intake team reads each brief and retypes it into the event catalog. In
+event, they write one event brief and send it to every ticketing partner they work with. Globoticket is
+one of those partners. Today the intake team reads each event brief and retypes it into the event catalog. In
 this course an LLM task takes over the retyping, inside an ordinary Airflow pipeline, and the intake
 team keeps the final approval.
 
@@ -18,6 +18,7 @@ team keeps the final approval.
 | The model | a GPT deployment in Microsoft Foundry (Azure OpenAI) | `globoticket_llm` |
 | Event briefs and review packets | Azure Data Lake Storage Gen2 | `globoticket_blob` |
 | The event catalog | PostgreSQL 16, in a container on the VM | `globoticket_pg` |
+| Venue bookings | a read-only HTTP API, in a container on the VM | `globoticket_api` |
 
 ---
 
@@ -60,8 +61,8 @@ Run these from the repo root, in order.
 
 ```bash
 ./scripts/1_provision_azure.sh      # resource group, storage, Azure OpenAI + model, network, VM
-./scripts/2_install_stack.sh        # Docker, the Globoticket image, Airflow 3.3.2, the catalog database
-./scripts/3_create_connections.sh   # the three Connections, then proves they work
+./scripts/2_install_stack.sh        # Docker, the Globoticket image, Airflow 3.3.2, the catalog database, the bookings API
+./scripts/3_create_connections.sh   # the four Connections, the catalog data, the event brief files, then proves they work
 ```
 
 Step 1 asks you to confirm the subscription before it creates anything, and it writes every endpoint and
@@ -80,6 +81,7 @@ says `success` and the last one says `ALL OK`, you are ready:
 
 ```
   success  ask_model       model call through globoticket_llm
+  success  check_api       authenticated call through globoticket_api
   success  check_postgres  query through globoticket_pg
   success  check_storage   listing abfs://globoticket-intake/ through globoticket_blob
   success  report_model    model reply read back from XCom
@@ -100,8 +102,8 @@ the rules in place rather than adding more.
 ./scripts/reset_demo.sh
 ```
 
-It starts the VM if you deallocated it, deletes the run history of the course Dags, and recreates the
-Connections.
+It starts the VM if you deallocated it, deletes the run history of the course Dags and the review packets
+module 3 published, then recreates the Connections, reloads the catalog and re-uploads the event brief files.
 
 ---
 
@@ -110,7 +112,7 @@ Connections.
 ```
 Dockerfile                          apache/airflow:3.3.2 plus the Common AI Provider, pinned
 sitecustomize.py                    a fix for an adlfs / pydantic-ai event-loop clash (see below)
-docker-compose.yaml                 Airflow 3.3.2 from the official quickstart file, plus the catalog database
+docker-compose.yaml                 Airflow 3.3.2 from the official quickstart file, plus the catalog database and the bookings API
 assets/promoter_request.txt         the promoter email module 1 works with
 assets/event-briefs/               the event brief files modules 2 and 3 read from Blob Storage (step 3 uploads them)
 assets/catalog/events.json         120 synthetic catalog events, loaded into the catalog database by step 3
@@ -127,8 +129,6 @@ dags/
   globoticket_check_environment.py  setup check that step 3 runs
 scripts/                            the three setup scripts and the reset
 ```
-
-More Dags arrive as the course goes on.
 
 ### The Dags only name a Connection
 
@@ -189,6 +189,7 @@ the loop, and Python loads it automatically in every Airflow process in the imag
 | Common AI Provider | `apache-airflow-providers-common-ai` 0.10.0, with the `openai` and `sql` extras |
 | Model | `gpt-4.1-mini`, version 2025-04-14, GlobalStandard |
 | PostgreSQL | 16, in a container |
+| Bookings API | FastAPI 0.115.6 on Python 3.12, in a container |
 | VM | Standard_B2as_v2, Ubuntu 22.04 |
 
 `Standard_B2ms` is the obvious VM size and it failed preflight in `canadacentral` with a capacity
